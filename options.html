@@ -156,7 +156,15 @@
 
     <div class="form-group hidden" id="geminiGroup">
       <label for="geminiKey">Gemini API Key</label>
-      <input type="password" id="geminiKey" placeholder="AIza..." autocomplete="off">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <input type="password" id="geminiKey" placeholder="AIza..." autocomplete="off" style="flex: 1; margin-bottom: 0;">
+        <button id="fetchModelsBtn" class="save-btn" style="margin-top: 0; white-space: nowrap;">دریافت مدل‌ها</button>
+      </div>
+      
+      <label for="geminiModel">مدل Gemini</label>
+      <select id="geminiModel">
+        <option value="gemini-1.5-flash">Gemini 1.5 Flash (پیش‌فرض)</option>
+      </select>
     </div>
     
     <button id="saveBtn" class="save-btn">ذخیره تنظیمات</button>

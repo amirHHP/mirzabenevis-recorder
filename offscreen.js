@@ -1,6 +1,7 @@
 let recorder;
 let audioChunks = [];
 let audioContext;
+let recordingPromiseResolve = null;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'START_OFFSCREEN_RECORDING') {
@@ -81,6 +82,11 @@ async function startRecording(streamId) {
 
     // Process transcription
     await processTranscription(blob);
+    
+    if (recordingPromiseResolve) {
+      recordingPromiseResolve();
+      recordingPromiseResolve = null;
+    }
   };
 
   recorder.start(1000); // 1-second chunks
@@ -88,29 +94,36 @@ async function startRecording(streamId) {
 
 async function stopRecording() {
   if (recorder && recorder.state !== 'inactive') {
-    recorder.stop();
+    return new Promise((resolve) => {
+      recordingPromiseResolve = resolve;
+      recorder.stop();
+    });
   }
 }
 
 async function processTranscription(blob) {
   try {
-    const { provider = 'openai', openaiApiKey, geminiApiKey } = await chrome.storage.local.get(['provider', 'openaiApiKey', 'geminiApiKey']);
+    const config = await chrome.runtime.sendMessage({ action: 'GET_CONFIG' });
+    const provider = config.provider || 'openai';
+    const openaiApiKey = config.openaiApiKey;
+    const geminiApiKey = config.geminiApiKey;
+    const geminiModel = config.geminiModel || 'gemini-3.1-flash-lite';
     
     if (provider === 'openai' && !openaiApiKey) {
       console.warn("No OpenAI API Key found. Downloading audio instead.");
       await downloadAudio(blob, 'meeting_audio.webm');
-      await chrome.storage.local.set({ lastStatus: 'Audio saved. Add OpenAI Key for transcription.' });
+      await chrome.runtime.sendMessage({ action: 'SET_STATUS', status: 'Audio saved. Add OpenAI Key for transcription.' });
       return;
     }
     
     if (provider === 'gemini' && !geminiApiKey) {
       console.warn("No Gemini API Key found. Downloading audio instead.");
       await downloadAudio(blob, 'meeting_audio.webm');
-      await chrome.storage.local.set({ lastStatus: 'Audio saved. Add Gemini Key for transcription.' });
+      await chrome.runtime.sendMessage({ action: 'SET_STATUS', status: 'Audio saved. Add Gemini Key for transcription.' });
       return;
     }
 
-    await chrome.storage.local.set({ lastStatus: 'Transcribing...' });
+    await chrome.runtime.sendMessage({ action: 'SET_STATUS', status: 'Transcribing...' });
     
     let transcription = '';
 
@@ -154,7 +167,7 @@ async function processTranscription(blob) {
         ]
       };
       
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -176,20 +189,12 @@ async function processTranscription(blob) {
     }
 
     // Save transcription
-    const { transcriptions = [] } = await chrome.storage.local.get('transcriptions');
-    transcriptions.push({
-      date: new Date().toISOString(),
-      text: transcription
-    });
-    
-    await chrome.storage.local.set({ 
-      transcriptions, 
-      lastStatus: 'Transcription complete!' 
-    });
+    await chrome.runtime.sendMessage({ action: 'SAVE_TRANSCRIPTION', text: transcription });
+    await chrome.runtime.sendMessage({ action: 'SET_STATUS', status: 'Transcription complete!' });
     
   } catch (error) {
     console.error("Transcription failed:", error);
-    await chrome.storage.local.set({ lastStatus: `Error: ${error.message}` });
+    await chrome.runtime.sendMessage({ action: 'SET_STATUS', status: `Error: ${error.message}` });
     await downloadAudio(blob, 'meeting_audio_error.webm');
   }
 }
@@ -204,15 +209,17 @@ function blobToBase64(blob) {
 }
 
 function downloadAudio(blob, filename) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = function() {
-      const base64data = reader.result;
-      chrome.downloads.download({
-        url: base64data,
+  return new Promise(async (resolve) => {
+    try {
+      const base64data = await blobToBase64(blob);
+      await chrome.runtime.sendMessage({
+        action: 'DOWNLOAD_AUDIO',
+        base64: base64data,
         filename: filename
-      }, () => resolve());
+      });
+    } catch (e) {
+      console.error("Failed to download audio:", e);
     }
-    reader.readAsDataURL(blob);
+    resolve();
   });
 }

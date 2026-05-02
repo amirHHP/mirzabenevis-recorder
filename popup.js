@@ -15,10 +15,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Check if we are already recording
   const response = await chrome.runtime.sendMessage({ action: 'GET_STATE' });
   if (response && response.recording) {
-    setRecordingState(true);
-    // Timer is tricky to sync perfectly without a background timestamp, 
-    // but for now we just show a static message or restart timer visually.
-    statusText.innerText = "در حال ضبط...";
+    if (response.startTime) {
+      startTime = response.startTime;
+    } else {
+      startTime = Date.now();
+    }
+    setRecordingState(true, false); // pass false so we don't overwrite startTime
   }
 
   checkMicrophonePermission();
@@ -72,12 +74,12 @@ recordBtn.addEventListener('click', async () => {
   }
 });
 
-function setRecordingState(recording) {
+function setRecordingState(recording, resetTime = true) {
   isRecording = recording;
   if (recording) {
     recorderSection.classList.add('recording');
     statusText.innerText = "در حال ضبط...";
-    startTimer();
+    startTimer(resetTime);
   } else {
     recorderSection.classList.remove('recording');
     statusText.innerText = "آماده ضبط";
@@ -85,8 +87,9 @@ function setRecordingState(recording) {
   }
 }
 
-function startTimer() {
-  startTime = Date.now();
+function startTimer(resetTime = true) {
+  if (resetTime) startTime = Date.now();
+  if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     const elapsed = Date.now() - startTime;
     const minutes = Math.floor(elapsed / 60000).toString().padStart(2, '0');
@@ -132,12 +135,16 @@ async function checkStatus() {
   if (lastStatus) {
     // Show a temporary status notification if needed, or just refresh list
     if (lastStatus === 'Transcription complete!') {
+      statusText.innerText = "آماده ضبط";
       loadTranscripts();
       // Clear status after showing
       await chrome.storage.local.remove('lastStatus');
     } else if (lastStatus.includes('Error') || lastStatus.includes('saved')) {
+      statusText.innerText = "آماده ضبط";
       alert(lastStatus);
       await chrome.storage.local.remove('lastStatus');
+    } else if (lastStatus === 'Transcribing...') {
+      statusText.innerText = "در حال پردازش صدا و تبدیل به متن...";
     }
   }
 }

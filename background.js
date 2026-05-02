@@ -3,6 +3,7 @@ let offscreenCreating = null;
 
 // Keep track of the active tab for recording
 let targetTabId = null;
+let recordingStartTime = null;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'START_RECORDING') {
@@ -14,15 +15,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     return true; // Keep message channel open for async response
   } else if (message.action === 'STOP_RECORDING') {
-    stopRecording()
-      .then(() => sendResponse({ success: true }))
-      .catch((error) => {
-        console.error("Error stopping recording:", error);
-        sendResponse({ success: false, error: error.message });
-      });
-    return true;
+    stopRecording().catch((error) => console.error("Error stopping recording:", error));
+    sendResponse({ success: true });
+    return false;
   } else if (message.action === 'GET_STATE') {
-    sendResponse({ recording });
+    sendResponse({ recording, startTime: recordingStartTime });
+  } else if (message.action === 'GET_CONFIG') {
+    chrome.storage.local.get(['provider', 'openaiApiKey', 'geminiApiKey', 'geminiModel'], (config) => {
+      sendResponse(config);
+    });
+    return true;
+  } else if (message.action === 'SAVE_TRANSCRIPTION') {
+    chrome.storage.local.get('transcriptions', (result) => {
+      const transcriptions = result.transcriptions || [];
+      transcriptions.push({
+        date: new Date().toISOString(),
+        text: message.text
+      });
+      chrome.storage.local.set({ transcriptions }, () => {
+        sendResponse({ success: true });
+      });
+    });
+    return true;
+  } else if (message.action === 'SET_STATUS') {
+    chrome.storage.local.set({ lastStatus: message.status }, () => {
+      sendResponse({ success: true });
+    });
+    return true;
+  } else if (message.action === 'DOWNLOAD_AUDIO') {
+    chrome.downloads.download({
+      url: "data:audio/webm;base64," + message.base64,
+      filename: message.filename
+    }, () => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
 });
 
@@ -71,6 +98,7 @@ async function startRecording() {
   }
 
   recording = true;
+  recordingStartTime = Date.now();
   chrome.action.setBadgeText({ text: 'REC' });
   chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
 }
@@ -84,6 +112,7 @@ async function stopRecording() {
   });
 
   recording = false;
+  recordingStartTime = null;
   chrome.action.setBadgeText({ text: '' });
   
   // Close the offscreen document
@@ -112,6 +141,10 @@ async function closeOffscreenDocument() {
 }
 
 async function hasDocument() {
+  if (chrome.offscreen && chrome.offscreen.hasDocument) {
+    return await chrome.offscreen.hasDocument();
+  }
+  // Fallback if needed
   const matchedClients = await clients.matchAll();
-  return matchedClients.some((c) => c.url.includes(chrome.runtime.id));
+  return matchedClients.some((c) => c.url.includes('offscreen.html'));
 }
