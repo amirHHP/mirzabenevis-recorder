@@ -115,19 +115,68 @@ async function loadTranscripts() {
   transcriptions.sort((a, b) => new Date(b.date) - new Date(a.date));
   
   transcriptsList.innerHTML = transcriptions.map(t => {
-    const dateObj = new Date(t.date);
-    const dateStr = new Intl.DateTimeFormat('fa-IR', { 
-      year: 'numeric', month: 'long', day: 'numeric', 
-      hour: '2-digit', minute: '2-digit' 
-    }).format(dateObj);
+    let durationStr = "";
+    if (t.duration) {
+      const totalSeconds = Math.floor(t.duration / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      durationStr = `${minutes} دقیقه و ${seconds} ثانیه`;
+    }
+    
+    // For older transcripts without an id
+    const id = t.id || t.date;
+    const name = t.name || `جلسه ضبط شده`;
     
     return `
-      <div class="transcript-card">
-        <span class="transcript-date">${dateStr}</span>
-        <div class="transcript-text" title="${t.text.replace(/"/g, '&quot;')}">${t.text}</div>
+      <div class="transcript-card" data-id="${id}">
+        <input type="text" class="transcript-name-input" value="${name}">
+        <div class="transcript-meta">
+          <span class="transcript-duration">${durationStr}</span>
+        </div>
+        <button class="download-btn" data-id="${id}">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          دانلود متن (TXT)
+        </button>
       </div>
     `;
   }).join('');
+
+  // Attach event listeners for name changes
+  document.querySelectorAll('.transcript-name-input').forEach(input => {
+    input.addEventListener('change', async (e) => {
+      const id = e.target.closest('.transcript-card').dataset.id;
+      const { transcriptions = [] } = await chrome.storage.local.get('transcriptions');
+      const t = transcriptions.find(tr => (tr.id || tr.date) === id);
+      if (t) {
+        t.name = e.target.value;
+        await chrome.storage.local.set({ transcriptions });
+      }
+    });
+  });
+
+  // Attach event listeners for download buttons
+  document.querySelectorAll('.download-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.currentTarget.dataset.id;
+      const { transcriptions = [] } = await chrome.storage.local.get('transcriptions');
+      const t = transcriptions.find(tr => (tr.id || tr.date) === id);
+      if (t) {
+        const blob = new Blob([t.text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${t.name || 'meeting'}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    });
+  });
 }
 
 async function checkStatus() {

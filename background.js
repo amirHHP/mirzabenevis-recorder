@@ -4,6 +4,7 @@ let offscreenCreating = null;
 // Keep track of the active tab for recording
 let targetTabId = null;
 let recordingStartTime = null;
+let lastRecordingDuration = 0;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'START_RECORDING') {
@@ -28,8 +29,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'SAVE_TRANSCRIPTION') {
     chrome.storage.local.get('transcriptions', (result) => {
       const transcriptions = result.transcriptions || [];
+      const defaultName = new Date().toLocaleDateString('fa-IR') + ' - ' + new Date().toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'});
       transcriptions.push({
+        id: Date.now().toString(),
+        name: `جلسه ${defaultName}`,
         date: new Date().toISOString(),
+        duration: lastRecordingDuration,
         text: message.text
       });
       chrome.storage.local.set({ transcriptions }, () => {
@@ -112,6 +117,9 @@ async function stopRecording() {
   });
 
   recording = false;
+  if (recordingStartTime) {
+    lastRecordingDuration = Date.now() - recordingStartTime;
+  }
   recordingStartTime = null;
   chrome.action.setBadgeText({ text: '' });
   

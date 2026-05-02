@@ -243,30 +243,79 @@ h1 {
 .transcript-card {
   background: var(--panel-bg);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 12px;
-  transition: border-color 0.2s;
+  border-radius: 12px;
+  padding: 14px;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .transcript-card:hover {
   border-color: var(--primary-color);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-.transcript-date {
+.transcript-name-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.transcript-name-input:hover, .transcript-name-input:focus {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--border-color);
+  outline: none;
+}
+
+.transcript-name-input:focus {
+  border-color: var(--primary-color);
+}
+
+.transcript-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.transcript-duration {
   font-size: 0.75rem;
   color: var(--text-muted);
-  margin-bottom: 6px;
-  display: block;
+  background: rgba(255,255,255,0.05);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
-.transcript-text {
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--text-main);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.download-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+  color: #fff;
+  border-color: rgba(99, 102, 241, 0.5);
 }
 
 .empty-state {
