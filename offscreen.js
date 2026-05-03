@@ -157,8 +157,8 @@ async function processTranscription(blob) {
             parts: [
               { text: "لطفاً فایل صوتی این جلسه را با دقت به متن تبدیل کن. بسیار مهم: در صورتی که چند نفر در حال صحبت هستند، لطفاً با توجه به تغییر صدا، صحبت‌های هر شخص را تفکیک کن و با برچسب‌هایی مانند [گوینده ۱] و [گوینده ۲] مشخص کن. هیچ توضیح اضافه‌ای نده و فقط مکالمات را بنویس." },
               {
-                inline_data: {
-                  mime_type: "audio/webm",
+                inlineData: {
+                  mimeType: "audio/webm",
                   data: base64Audio
                 }
               }
@@ -188,6 +188,9 @@ async function processTranscription(blob) {
       }
     }
 
+    // Always download audio as backup
+    await downloadAudio(blob, 'meeting_audio.webm');
+    
     // Save transcription
     await chrome.runtime.sendMessage({ action: 'SAVE_TRANSCRIPTION', text: transcription });
     await chrome.runtime.sendMessage({ action: 'SET_STATUS', status: 'Transcription complete!' });
